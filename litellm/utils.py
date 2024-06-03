@@ -86,6 +86,7 @@ from .integrations.s3 import S3Logger
 from .integrations.clickhouse import ClickhouseLogger
 from .integrations.greenscale import GreenscaleLogger
 from .integrations.litedebugger import LiteDebugger
+from .integrations.phoenix_logger import PhoenixLogger
 from .proxy._types import KeyManagementSystem
 from openai import OpenAIError as OriginalError
 from openai._models import BaseModel as OpenAIObject
@@ -159,6 +160,7 @@ s3Logger = None
 genericAPILogger = None
 clickHouseLogger = None
 greenscaleLogger = None
+phoenixLogger = None
 lunaryLogger = None
 aispendLogger = None
 berrispendLogger = None
@@ -1988,6 +1990,13 @@ class Logging:
                             start_time=start_time,
                             end_time=end_time,
                             print_verbose=print_verbose,
+                        )
+                    if callback == "phoenix":
+                        phoenixLogger.log_success_event(
+                            kwargs=kwargs,
+                            response_obj=result,
+                            start_time=start_time,
+                            end_time=end_time,
                         )
                     if callback == "cache" and litellm.cache is not None:
                         # this only logs streaming once, complete_streaming_response exists i.e when stream ends
@@ -7614,7 +7623,7 @@ def validate_environment(model: Optional[str] = None) -> dict:
 
 def set_callbacks(callback_list, function_id=None):
 
-    global sentry_sdk_instance, capture_exception, add_breadcrumb, posthog, slack_app, alerts_channel, traceloopLogger, athinaLogger, heliconeLogger, aispendLogger, berrispendLogger, supabaseClient, liteDebuggerClient, lunaryLogger, promptLayerLogger, langFuseLogger, customLogger, weightsBiasesLogger, langsmithLogger, logfireLogger, dynamoLogger, s3Logger, dataDogLogger, prometheusLogger, greenscaleLogger, openMeterLogger
+    global sentry_sdk_instance, capture_exception, add_breadcrumb, posthog, slack_app, alerts_channel, traceloopLogger, athinaLogger, heliconeLogger, aispendLogger, berrispendLogger, supabaseClient, liteDebuggerClient, lunaryLogger, promptLayerLogger, langFuseLogger, customLogger, weightsBiasesLogger, langsmithLogger, logfireLogger, dynamoLogger, s3Logger, dataDogLogger, prometheusLogger, greenscaleLogger, openMeterLogger, phoenixLogger
 
     try:
         for callback in callback_list:
@@ -7708,6 +7717,9 @@ def set_callbacks(callback_list, function_id=None):
             elif callback == "greenscale":
                 greenscaleLogger = GreenscaleLogger()
                 print_verbose("Initialized Greenscale Logger")
+            elif callback == "phoenix":
+                phoenixLogger = PhoenixLogger()
+                print_verbose("Initialized Phoenix logger")
             elif callback == "lite_debugger":
                 print_verbose(f"instantiating lite_debugger")
                 if function_id:
