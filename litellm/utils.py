@@ -1992,6 +1992,11 @@ class Logging:
                             print_verbose=print_verbose,
                         )
                     if callback == "phoenix":
+                        kwargs = {}
+                        for k, v in self.model_call_details.items():
+                            if (k != "original_response"):
+                                kwargs[k] = v
+
                         phoenixLogger.log_success_event(
                             kwargs=kwargs,
                             response_obj=result,

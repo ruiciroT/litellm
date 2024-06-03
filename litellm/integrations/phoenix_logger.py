@@ -78,23 +78,34 @@ class LitellmInstrumentor:
         self.tracer = self.tracer_provider.get_tracer(__name__)
         logger.debug("Tracer initialized")
 
-    def log_interaction(self, input_args: Dict[str, Any], response: Any, session_name: str = "default", parent_span: Any = None) -> None:
+    def log_interaction(self, input_args: Dict[str, Any], response: Any, session_name: str = "default",
+                        parent_span: Any = None) -> None:
         logger.debug("Starting log_interaction")
         context = trace_api.set_span_in_context(parent_span) if parent_span else None
         with self.tracer.start_as_current_span(session_name, context=context) as span:
             logger.debug("Span started")
-            span.update_name(response.object)
-            span.set_attribute(SpanAttributes.INPUT_VALUE, input_args['messages'][0]['content'])
-            span.set_attribute(SpanAttributes.LLM_MODEL_NAME, input_args['model'])
-            span.set_attribute(SpanAttributes.OUTPUT_VALUE, response.choices[0]['message']['content'])
-            span.set_attribute(SpanAttributes.LLM_TOKEN_COUNT_PROMPT, response.usage['prompt_tokens'])
-            span.set_attribute(SpanAttributes.LLM_TOKEN_COUNT_COMPLETION, response.usage['completion_tokens'])
-            span.set_attribute(SpanAttributes.LLM_TOKEN_COUNT_TOTAL, response.usage['total_tokens'])
+
+            # Set default values and check for key existence
+            response_object = getattr(response, 'object', 'default_object')
+            messages_content = input_args.get('messages', [{}])[0].get('content', 'noMessagesRetrieved')
+            model_name = input_args.get('model', 'noModelDetected')
+            output_value = response.choices[0].get('message', {}).get('content', 'noOutputRetrieved')
+            usage = response.get('usage', {})
+            prompt_tokens = usage.get('prompt_tokens', 0)
+            completion_tokens = usage.get('completion_tokens', 0)
+            total_tokens = usage.get('total_tokens', 0)
+
+            span.update_name(response_object)
+            span.set_attribute(SpanAttributes.INPUT_VALUE, messages_content)
+            span.set_attribute(SpanAttributes.LLM_MODEL_NAME, model_name)
+            span.set_attribute(SpanAttributes.OUTPUT_VALUE, output_value)
+            span.set_attribute(SpanAttributes.LLM_TOKEN_COUNT_PROMPT, prompt_tokens)
+            span.set_attribute(SpanAttributes.LLM_TOKEN_COUNT_COMPLETION, completion_tokens)
+            span.set_attribute(SpanAttributes.LLM_TOKEN_COUNT_TOTAL, total_tokens)
             span.set_attribute(SpanAttributes.OPENINFERENCE_SPAN_KIND, 'LLM')
             span.set_status(trace_api.StatusCode.OK)
             span.add_event("interaction_details_registered!")
             logger.debug(f"Span {span.get_span_context().span_id} created and populated with attributes")
-
 
 class PhoenixLogger(CustomLogger):
     def __init__(self):
@@ -142,6 +153,30 @@ def test_litellm_with_custom_logger() -> None:
         logger.debug(f"Received response: {response}")
 
 
+def test_litellm_with_phoenix_logger() -> None:
+
+    if not (openai_api_key := os.getenv("OPENAI_API_KEY")):
+        openai_api_key = getpass("🔑 Enter your OpenAI API key: ")
+    openai.api_key = openai_api_key
+    os.environ["OPENAI_API_KEY"] = openai_api_key
+
+    px.launch_app()
+
+    # Assign the custom logger to LiteLLM
+    litellm.success_callback = ["phoenix"]
+
+    questions = [
+        "How can Arize AI help me evaluate my LLM models?",
+        "What are the key features of Arize AI for model monitoring?",
+        "Can Arize AI handle real-time data for model performance analysis?",
+    ]
+    for current_question in questions:
+        messages = [{"content": current_question, "role": "user"}]
+        response = litellm.completion(model="gpt-4-turbo", messages=messages, stream=False)
+        logger.debug(f"Received response: {response}")
+
+
 if __name__ == '__main__':
-    test_litellm_with_custom_logger()
+    #test_litellm_with_custom_logger()
+    test_litellm_with_phoenix_logger()
     print('Tests finished!')
